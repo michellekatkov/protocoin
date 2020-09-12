@@ -2,7 +2,8 @@ import time
 import random
 import hashlib
 import struct
-from cStringIO import StringIO
+#from cStringIO import StringIO
+from io import StringIO,BytesIO
 from collections import OrderedDict
 
 from . import fields
@@ -22,7 +23,7 @@ class SerializerMeta(type):
         """This method will construct an ordered dict with all
         the fields present on the serializer classes."""
         fields = [(field_name, attrs.pop(field_name))
-            for field_name, field_value in list(attrs.iteritems())
+            for field_name, field_value in list(attrs.items())
             if isinstance(field_value, field_class)]
 
         for base_cls in bases[::-1]:
@@ -32,9 +33,9 @@ class SerializerMeta(type):
         fields.sort(key=lambda it: it[1].count)
         return OrderedDict(fields)
 
-class SerializerABC(object):
+class SerializerABC(object,metaclass=SerializerMeta):
     """The serializer abstract base class."""
-    __metaclass__ = SerializerMeta
+    #__metaclass__ = SerializerMeta ### from py 2.7
 
 class Serializer(SerializerABC):
     """The main serializer class, inherit from this class to
@@ -51,12 +52,14 @@ class Serializer(SerializerABC):
 
         :param obj: The object to serializer.
         """
-        bin_data = StringIO()
-        for field_name, field_obj in self._fields.iteritems():
+        bin_data = BytesIO()
+        for field_name, field_obj in self._fields.items():
             if fields:
                 if field_name not in fields:
                     continue
             attr = getattr(obj, field_name, None)
+            #print( 'serializers.serialize',field_name, attr )
+            
             field_obj.parse(attr)
             bin_data.write(field_obj.serialize())
 
@@ -69,7 +72,7 @@ class Serializer(SerializerABC):
         :param stream: A file-like object (StringIO, file, socket, etc.)
         """
         model = self.model_class()
-        for field_name, field_obj in self._fields.iteritems():
+        for field_name, field_obj in self._fields.items():
             value = field_obj.deserialize(stream)
             setattr(model, field_name, value)
         return model
@@ -101,7 +104,7 @@ class MessageHeader(object):
 
     def _magic_to_text(self):
         """Converts the magic value to a textual representation."""
-        for k, v in fields.MAGIC_VALUES.iteritems():
+        for k, v in fields.MAGIC_VALUES.items():
             if v == self.magic:
                 return k
         return "Unknown Magic"
@@ -142,7 +145,7 @@ class IPv4Address(object):
         self.port = 8333
 
     def __repr__(self):
-        services = utils.services_to_text(self.services)
+        services = util.services_to_text(self.services)
         if not services:
             services = "No Services"
         return "<%s IP=[%s:%d] Services=%r>" % (self.__class__.__name__,
@@ -159,7 +162,7 @@ class IPv4AddressTimestamp(IPv4Address):
     """The IPv4 Address with timestamp."""
     def __init__(self):
         super(IPv4AddressTimestamp, self).__init__()
-        self.timestamp = time.time()
+        self.timestamp = int(time.time())
 
     def __repr__(self):
         services = util.services_to_text(self.services)
@@ -183,7 +186,7 @@ class Version(SerializableMessage):
     def __init__(self):
         self.version = fields.PROTOCOL_VERSION
         self.services = fields.SERVICES["NODE_NETWORK"]
-        self.timestamp = time.time()
+        self.timestamp = int(time.time())
         self.addr_recv = IPv4Address()
         self.addr_from = IPv4Address()
         self.nonce = random.randint(0, 2**32-1)
@@ -250,7 +253,7 @@ class Inventory(SerializableMessage):
 
     def type_to_text(self):
         """Converts the inventory type to text representation."""
-        for k, v in fields.INVENTORY_TYPE.iteritems():
+        for k, v in fields.INVENTORY_TYPE.items():
             if v == self.inv_type:
                 return k
         return "Unknown Type"
@@ -413,7 +416,7 @@ class Tx(SerializableMessage):
         bin_data = serializer.serialize(self, hash_fields)
         h = hashlib.sha256(bin_data).digest()
         h = hashlib.sha256(h).digest()
-        return h[::-1].encode("hex_codec")
+        return h[::-1].hex()
 
     def __repr__(self):
         return "<%s Version=[%d] Lock Time=[%s] TxIn Count=[%d] Hash=[%s] TxOut Count=[%d]>" \
@@ -447,7 +450,7 @@ class BlockHeader(SerializableMessage):
         bin_data = serializer.serialize(self, hash_fields)
         h = hashlib.sha256(bin_data).digest()
         h = hashlib.sha256(h).digest()
-        return h[::-1].encode("hex_codec")
+        return h[::-1].hex()
 
     def __repr__(self):
         return "<%s Version=[%d] Timestamp=[%s] Nonce=[%d] Hash=[%s] Tx Count=[%d]>" % \

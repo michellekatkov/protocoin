@@ -12,10 +12,12 @@ class BitcoinPublicKey(object):
 
     :param hexkey: The key in hex string format
     """
-    key_prefix = '\x04'
+    key_prefix = b'\x04'
 
     def __init__(self, hexkey):
-        stringkey = hexkey.decode("hex")[1:]
+        #print( "hexkey", hexkey )
+        #stringkey = hexkey.decode("hex")[1:]        
+        stringkey = bytearray.fromhex(hexkey)[1:]
         self.public_key = ecdsa.VerifyingKey.from_string(stringkey,
             curve=ecdsa.SECP256k1)
     
@@ -28,7 +30,8 @@ class BitcoinPublicKey(object):
         :returns: a new public key
         """
         public_key = private_key.get_verifying_key()
-        hexkey = (klass.key_prefix + public_key.to_string()).encode("hex")
+        #print('from_private_key', klass,type(klass.key_prefix), type(public_key))
+        hexkey = (klass.key_prefix + public_key.to_string()).hex()
         return klass(hexkey)
 
     def to_string(self):
@@ -45,8 +48,8 @@ class BitcoinPublicKey(object):
 
         :returns: Hex string representation of the public key
         """
-        hexkey = self.public_key.to_string().encode("hex")
-        return self.key_prefix.encode("hex") + hexkey.upper()
+        hexkey = self.public_key.to_string().hex()
+        return self.key_prefix.hex() + hexkey.upper()
 
     def to_address(self):
         """This method will convert the public key to
@@ -61,7 +64,7 @@ class BitcoinPublicKey(object):
         ripemd160_digest = ripemd160.digest()
         
         # Prepend the version info
-        ripemd160_digest = '\x00' + ripemd160_digest
+        ripemd160_digest = b'\x00' + ripemd160_digest
         
         # Calc checksum
         checksum = hashlib.sha256(ripemd160_digest).digest()
@@ -70,7 +73,7 @@ class BitcoinPublicKey(object):
         
         # Append checksum
         address = ripemd160_digest + checksum
-        address_bignum = int('0x' + address.encode('hex'), 16)
+        address_bignum = int('0x' + address.hex(), 16)
         base58 = util.base58_encode(address_bignum)
         return '1' + base58
 
@@ -114,7 +117,7 @@ class BitcoinPrivateKey(object):
         :param stringkey: The key in string format
         :returns: A new Private Key
         """     
-        hexvalue = stringkey.encode("hex")
+        hexvalue = stringkey.hex()
         return klass(hexvalue)
 
     @classmethod
@@ -136,7 +139,7 @@ class BitcoinPrivateKey(object):
         if shasecond[:4]!=checksum:
             raise RuntimeError("Invalid checksum for the address.")
 
-        return klass(key[1:].encode("hex"))
+        return klass(key[1:].hex())
 
     def to_hex(self):
         """This method will convert the Private Key to
@@ -144,7 +147,10 @@ class BitcoinPrivateKey(object):
 
         :returns: Hex string representation of the Private Key
         """
-        hexkey = self.private_key.to_string().encode("hex")
+        #print('keys.BitcoinPrivateKey.private_key', self.private_key, type(self.private_key))
+        hexkey = self.private_key.to_string().hex()
+        #hexkey = self.private_key.to_string().encode("hex")
+
         return hexkey.upper()
 
     def to_string(self):
@@ -166,7 +172,7 @@ class BitcoinPrivateKey(object):
         shasecond = hashlib.sha256(shafirst).digest()
         checksum = shasecond[:4]
         extendedkey = extendedkey + checksum
-        key_bignum = int('0x' + extendedkey.encode('hex'), 16)
+        key_bignum = int('0x' + extendedkey.hex(), 16)
         base58 = util.base58_encode(key_bignum)
         return base58
 

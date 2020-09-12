@@ -37,7 +37,7 @@ def services_to_text(services):
     service_strings = []
     named_services = []
     # convert every service we have a name for that this endpoint offers
-    for service_name, flag_mask in fields.SERVICES.iteritems():
+    for service_name, flag_mask in fields.SERVICES.items():
         if services & flag_mask:
             service_strings.append(service_name)
             named_services.append(flag_mask)

@@ -1,4 +1,5 @@
-from cStringIO import StringIO
+#from cStringIO import StringIO
+from io import BytesIO
 from .serializers import *
 from .exceptions import NodeDisconnectException, InvalidMessageChecksum
 import os
@@ -6,7 +7,7 @@ import os
 
 class ProtocolBuffer(object):
     def __init__(self):
-        self.buffer = StringIO()
+        self.buffer = BytesIO()
         self.header_size = MessageHeaderSerializer.calcsize()
 
     def write(self, data):
@@ -20,18 +21,22 @@ class ProtocolBuffer(object):
         # Calculate the size of the buffer
         self.buffer.seek(0, os.SEEK_END)
         buffer_size = self.buffer.tell()
-
+        #print( 'receive_message: buffer_size', buffer_size, self.header_size )
+        
         # Check if a complete header is present
         if buffer_size < self.header_size:
             return (None, None)
 
         # Go to the beginning of the buffer
-        self.buffer.reset()
+        #self.buffer.reset()
+        self.buffer.seek(0)
+        #self.buffer.truncate()
 
         message_model = None
         message_header_serial = MessageHeaderSerializer()
         message_header = message_header_serial.deserialize(self.buffer)
         total_length = self.header_size + message_header.length
+        #print( 'receive_message: total_length', total_length, self.header_size, message_header.length )
 
         # Incomplete message
         if buffer_size < total_length:
@@ -39,8 +44,8 @@ class ProtocolBuffer(object):
             return (message_header, None)
 
         payload = self.buffer.read(message_header.length)
-        remaining = self.buffer.read()
-        self.buffer = StringIO()
+        remaining = self.buffer.read()        
+        self.buffer = BytesIO()
         self.buffer.write(remaining)
         payload_checksum = MessageHeaderSerializer.calc_checksum(payload)
 
@@ -48,10 +53,11 @@ class ProtocolBuffer(object):
         if payload_checksum != message_header.checksum:
             msg = "Bad checksum for command %s" % message_header.command
             raise InvalidMessageChecksum(msg)
-
+        
+        #print( 'receive_message: command', message_header.command, message_header.command in MESSAGE_MAPPING )
         if message_header.command in MESSAGE_MAPPING:
             deserializer = MESSAGE_MAPPING[message_header.command]()
-            message_model = deserializer.deserialize(StringIO(payload))
+            message_model = deserializer.deserialize(BytesIO(payload))
 
         return (message_header, message_model)
 
@@ -106,12 +112,13 @@ class BitcoinBasicClient(object):
 
             if message_header is not None:
                 self.handle_message_header(message_header, data)
-
+            #print('message:',message)
             if not message:
                 continue
 
             handle_func_name = "handle_" + message_header.command
             handle_func = getattr(self, handle_func_name, None)
+            #print('clients.looooop',message_header.command,handle_func_name,handle_func)
             if handle_func:
                 handle_func(message_header, message)
 
